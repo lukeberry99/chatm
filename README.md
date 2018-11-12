@@ -11,7 +11,14 @@
 4. WebSockets
 5. Stateless
 
-## Example architecture
+## Potential pitfalls
+1. Redis > 1000 nodes has some pitfalls
+	1.1 unlikely we will reach this 1000 node issue, switching to RabbitMQ would stop this and potentially 
+
+
+<details>
+<summary>Example architecture</summary>
+<p>
 ```
                     ┌──────────────────────┐                  
                     │    load balancer     │                  
@@ -39,3 +46,5 @@
 │                 └───────────────────────────┘              │
 └────────────────────────────────────────────────────────────┘
 ```
+</p>
+</details>
