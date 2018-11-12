@@ -10,6 +10,7 @@
 3. Deployed to ECS / Fargate
 4. WebSockets
     4.1. github.com/gorilla/websocket
+    4.2. requires IE >= 9, android >= 4.4
 6. Stateless
 
 ## Potential pitfalls
