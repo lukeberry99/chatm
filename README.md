@@ -18,7 +18,7 @@
 * 1 go routine replying
 
 ## Potential pitfalls
-1. Redis > 1000 nodes has some pitfalls
+1. Redis > 1000 nodes has some concurrency / parallelism issues
 	1.1. unlikely we will reach this 1000 node issue, switching to RabbitMQ would stop this and potentially 
     
 <details>

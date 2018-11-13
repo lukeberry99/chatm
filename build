@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 
 CONTAINER_NAME="chatmi"
+PORT="8181"
 
 if [ $# -gt 0 ]; then
     if [ "$1" == "attach" ]; then
         docker build -t $CONTAINER_NAME .
         docker stop $CONTAINER_NAME
         docker rm $CONTAINER_NAME
-        docker run -p 3000:3000 -d --name="$CONTAINER_NAME" $CONTAINER_NAME
+        docker run -p $PORT:$PORT -d --name="$CONTAINER_NAME" $CONTAINER_NAME
         docker logs -f $(docker ps -aqf "name=$CONTAINER_NAME")
     elif [ "$1" == "run" ]; then
         docker build -t $CONTAINER_NAME .
-        docker run -p 3000:3000 -d --name="$CONTAINER_NAME" $CONTAINER_NAME
+        docker run -p $PORT:$PORT -d --name="$CONTAINER_NAME" $CONTAINER_NAME
     elif [ "$1" == "clean" ]; then
         docker stop $CONTAINER_NAME
         docker rm $CONTAINER_NAME
@@ -19,9 +20,3 @@ if [ $# -gt 0 ]; then
 else
 docker build -t $CONTAINER_NAME .
 fi
-
-# docker build -t chatmi .
-# docker stop chatmi
-# docker rm chatmi
-# docker run -p 3000:3000 -d --name="chatmi" chatmi 
-# docker logs -f $(docker ps -aqf "name=chatmi")

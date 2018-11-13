@@ -3,80 +3,86 @@ package main
 import (
   "log"
   "net/http"
-  "time"
   "github.com/gorilla/websocket"
 )
 
+var clients = make(map[*websocket.Conn]bool) // map of connected clients
+var broadcast = make(chan Message) // broadcast channel
 var upgrader = websocket.Upgrader{}
 
+// Define our message object
+type Message struct {
+  Email string `json:"email"`
+  Username string `json:"username"`
+  Message string `json:"message"`
+}
+
 func main() {
-  // Display an index.html
-  http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-    http.ServeFile(w, r, "index.html")
-  })
+  // File server
+  fs := http.FileServer(http.Dir("./public"))
+  http.Handle("/", fs)
 
-  // Receive a WebSocket message, relay it back to the client
-  http.HandleFunc("/v1/ws", func (w http.ResponseWriter, r *http.Request) {
-    var conn, _ = upgrader.Upgrade(w, r, nil) // third param is headers go func(conn *websocket.Conn) {
-    go func(conn *websocket.Conn) {
-      for {
-        mType, msg, _ := conn.ReadMessage()
+  // Configure websocket route
+  http.HandleFunc("/ws", handleConnections)
 
-        conn.WriteMessage(mType, msg)
-      }
-    }(conn)
-  })
+  // Start a goroutine listening for messages
+  go handleMessages()
 
-  // Receive a WebSocket message, log it to the server
-  http.HandleFunc("/v2/ws", func (w http.ResponseWriter, r *http.Request) {
-    var conn, _ = upgrader.Upgrade(w, r, nil)
-    go func(conn *websocket.Conn) {
-      for {
-        _, msg, _ := conn.ReadMessage()
-
-        log.Print("v2 socket response: ", string(msg))
-      }
-    }(conn)
-  })
-
-  // Send a message over a WebSocket every 5 seconds
-  http.HandleFunc("/v3/ws", func (w http.ResponseWriter, r *http.Request) {
-    var conn, _ = upgrader.Upgrade(w, r, nil)
-    go func(conn *websocket.Conn) {
-      ch := time.Tick(5 * time.Second)
-      for range ch {
-        conn.WriteJSON(MessageStruct{
-          Username: "lukeberry99",
-          FirstName: "Luke",
-          LastName: "Berry",
-        })
-      }
-    }(conn)
-  })
-
-  // Handle the closing of a WebSocket
-  http.HandleFunc("/v4/ws", func (w http.ResponseWriter, r *http.Request) {
-    var conn, _ = upgrader.Upgrade(w, r, nil)
-    go func(conn *websocket.Conn) {
-      for {
-        _, _, err := conn.ReadMessage()
-
-        if err != nil {
-          conn.Close()
-        }
-      }
-    }(conn)
-  })
-
-  log.Print("HTTP Server listening on :3000")
-  err := http.ListenAndServe(":3000", nil)
+  log.Println("HTTP Server listening on :8181")
+  err := http.ListenAndServe(":8181", nil)
   if err != nil {
-    log.Fatal("HTTP Server crashed: %v", err)
+    log.Fatal("HTTP Server failed: ", err)
   }
 }
 
-type MessageStruct struct {
-  Username string `json:"username"`
-  FirstName string `json:"firstName"`
-  LastName string `json:"lastName"`
+func handleConnections(w http.ResponseWriter, r *http.Request) {
+  // Upgrade initial GET request into a websocket
+  ws, err := upgrader.Upgrade(w, r, nil)
+  if err != nil {
+    log.Fatal("WS", err)
+  }
+
+  // Make sure we close the connection when the function returns
+  defer ws.Close()
+
+  // Register our new client
+  clients[ws] = true
+
+  // Loop, waiting for a reply
+  for {
+    var msg Message
+
+    // Read the message and map it to our Message Struct
+    err := ws.ReadJSON(&msg)
+
+    // If there was an error of any sort we can assume that the client is no longer connected, and remove
+    // them from the map
+    if err != nil {
+      log.Printf("Error: %v", err)
+      delete(clients, ws)
+      break
+    }
+
+    // Some black magic to send the received message to the broadcaster
+    broadcast <- msg
+  }
+}
+
+func handleMessages() {
+  // Loop, broadcasting messages
+  for {
+    // Grab the next messaage from the broadcast channel
+    msg := <-broadcast
+    // Send it out to every client that is currently connected
+    for client := range clients {
+      err := client.WriteJSON(msg)
+      // If there was an error broadcasting to a client, we can assume that the client is no longer connected
+      // adn remove them from the map
+      if err != nil {
+        log.Printf("Failed to broadcast: %v", err)
+        client.Close()
+        delete(clients, client)
+      }
+    }
+  }
 }
